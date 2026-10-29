@@ -57,20 +57,24 @@ def tum_liglerin_verisini_getir():
 
     return [], False
 
+def metni_temizle(metin):
+    tr_map = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+    metin = metin.translate(tr_map)
+    gereksiz = ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Oznur", "Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC"]
+    kelimeler = [k for k in metin.split() if k not in gereksiz]
+    return " ".join(kelimeler), kelimeler
+
 def takim_id_bul(takim_adi, headers):
-    gereksiz = ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Öznur Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC"]
-    kelimeler = takim_adi.split()
-    temiz_kelimeler = [k for k in kelimeler if k not in gereksiz]
+    temiz_metin, kelimeler = metni_temizle(takim_adi)
     
     arama_listesi = [
-        takim_adi,
-        " ".join(temiz_kelimeler),
-        temiz_kelimeler[-1] if temiz_kelimeler else takim_adi,
-        temiz_kelimeler[0] if temiz_kelimeler else takim_adi
+        temiz_metin,
+        kelimeler[-1] if kelimeler else takim_adi,
+        kelimeler[0] if kelimeler else takim_adi,
+        takim_adi
     ]
     
-    # Mükerrer aramaları engelle
-    arama_listesi = list(dict.fromkeys([s.strip() for s in arama_listesi if s.strip()]))
+    arama_listesi = list(dict.fromkeys([s.strip() for s in arama_listesi if len(s.strip()) > 2]))
 
     for sorgu in arama_listesi:
         try:
@@ -104,7 +108,7 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
 
 # --- KONTROL PANELİ ---
 st.sidebar.header("Kontrol Paneli")
-if st.sidebar.button("Bülteni Yenile"):
+if st.sidebar.button("Bulteni Yenile"):
     if os.path.exists(CACHE_FILE):
         os.remove(CACHE_FILE)
     st.rerun()
@@ -133,7 +137,7 @@ for idx, m in enumerate(maclar):
         gecerli_maclar.append(m)
 
 if not gecerli_maclar:
-    st.error("Önbellekteki maç verisinin biçimi uyumsuz.")
+    st.error("Onbellekteki mac verisinin bicimi uyumsuz.")
     st.stop()
 
 secilen_str = st.selectbox("Simule Etmek Istedigin Maci Sec:", mac_listesi)
@@ -151,19 +155,4 @@ if isinstance(bookmakers, list):
         if isinstance(bm, dict):
             b_name = bm.get("title", "Buro")
             for mkt in bm.get("markets", []):
-                if isinstance(mkt, dict) and mkt.get("key") == "h2h":
-                    outcomes = mkt.get("outcomes", [])
-                    e = next((i["price"] for i in outcomes if isinstance(i, dict) and i.get("name") == ev), None)
-                    b = next((i["price"] for i in outcomes if isinstance(i, dict) and i.get("name") == "Draw"), None)
-                    d = next((i["price"] for i in outcomes if isinstance(i, dict) and i.get("name") == dep), None)
-                    if e and b and d:
-                        ev_o.append(e)
-                        ber_o.append(b)
-                        dep_o.append(d)
-                        buro_detaylari.append({"Buro": b_name, "MS 1": e, "MS X": b, "MS 2": d})
-
-avg_ev = np.mean(ev_o) if ev_o else 2.00
-avg_ber = np.mean(ber_o) if ber_o else 3.20
-avg_dep = np.mean(dep_o) if dep_o else 3.50
-
-max_ev = max(ev
+                if isinstance(mkt, dict) and mkt.get("key") == "h2
