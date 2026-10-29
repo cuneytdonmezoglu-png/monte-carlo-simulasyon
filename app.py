@@ -8,8 +8,18 @@ from datetime import datetime
 
 st.set_page_config(page_title="Pro Monte Carlo & Skor Analiz Paneli", page_icon="⚽", layout="wide")
 
-ODDS_API_KEY = "f6649c5150399729774787d9fac15cbb"
-RAPID_API_KEY = "0a912cbbe6msh15ad4f09e04d7a8p1c1967jsn3d1970aec964"
+def _anahtar_oku(isim):
+    try:
+        if isim in st.secrets:
+            return str(st.secrets[isim])
+    except Exception:
+        pass
+    return os.environ.get(isim, "")
+
+ODDS_API_KEY = _anahtar_oku("ODDS_API_KEY")
+API_FOOTBALL_KEY = _anahtar_oku("API_FOOTBALL_KEY")
+API_FOOTBALL_BASE = "https://v3.football.api-sports.io"
+H2H_MAC_SAYISI = 20
 CACHE_FILE = "maclar_cache.json"
 
 st.title("⚽ Profesyonel Futbol Monte Carlo, Skor Tahmin & H2H Paneli")
@@ -63,38 +73,68 @@ def tum_liglerin_verisini_getir():
 def takim_id_bul(takim_adi, headers):
     if not isinstance(takim_adi, str):
         return None
-    parcalar = [p.strip() for p in takim_adi.split() if len(p.strip()) > 2]
-    arama_terimi = parcalar[-1] if parcalar else takim_adi
-    
-    try:
-        url = "https://api-football-v1.p.rapidapi.com/v3/teams?search=" + arama_terimi
-        res = requests.get(url, headers=headers, timeout=4)
-        if res.status_code == 200:
-            data = res.json().get("response", [])
-            if data and isinstance(data, list) and len(data) > 0:
-                return data[0]["team"]["id"]
-    except Exception:
-        pass
+    temiz = takim_adi.replace(".", " ").strip()
+    parcalar = [p.strip() for p in temiz.split() if len(p.strip()) > 2]
+    adaylar = []
+    if parcalar:
+        adaylar.append(parcalar[-1])
+        if parcalar[0] != parcalar[-1]:
+            adaylar.append(parcalar[0])
+    adaylar.append(temiz)
+    for arama_terimi in adaylar:
+        try:
+            res = requests.get(
+                API_FOOTBALL_BASE + "/teams",
+                headers=headers,
+                params={"search": arama_terimi},
+                timeout=6
+            )
+            if res.status_code == 200:
+                data = res.json().get("response", [])
+                if data and isinstance(data, list):
+                    # Tam isim eslesmesi varsa onu tercih et
+                    for d in data:
+                        if str(d.get("team", {}).get("name", "")).lower() == takim_adi.lower():
+                            return d["team"]["id"]
+                    return data[0]["team"]["id"]
+        except Exception:
+            pass
     return None
 
 @st.cache_data(ttl=86400)
 def h2h_ve_form_getir(ev_takim, dep_takim):
-    headers = {
-        "x-rapidapi-key": RAPID_API_KEY,
-        "x-rapidapi-host": "api-football-v1.p.rapidapi.com"
-    }
+    """Donus: (mac_listesi, hata_mesaji). Basariliysa hata_mesaji None."""
+    if not API_FOOTBALL_KEY:
+        return [], "API_FOOTBALL_KEY bulunamadi (st.secrets veya ortam degiskeni olarak ekleyin)."
+    headers = {"x-apisports-key": API_FOOTBALL_KEY}
     try:
         ev_id = takim_id_bul(ev_takim, headers)
         dep_id = takim_id_bul(dep_takim, headers)
-        
-        if ev_id and dep_id:
-            h2h_url = "https://api-football-v1.p.rapidapi.com/v3/fixtures/headtohead?h2h=" + str(ev_id) + "-" + str(dep_id)
-            res_h2h = requests.get(h2h_url, headers=headers, timeout=5)
-            if res_h2h.status_code == 200:
-                return res_h2h.json().get("response", [])[:10]
-    except Exception:
-        pass
-    return []
+        if not (ev_id and dep_id):
+            return [], "Takimlardan biri API-Football'da bulunamadi."
+        res = requests.get(
+            API_FOOTBALL_BASE + "/fixtures/headtohead",
+            headers=headers,
+            params={"h2h": str(ev_id) + "-" + str(dep_id), "last": H2H_MAC_SAYISI},
+            timeout=8
+        )
+        if res.status_code != 200:
+            return [], "API hatasi: HTTP " + str(res.status_code)
+        js = res.json()
+        errors = js.get("errors")
+        if errors:
+            # Ornek: ucretsiz planda sezon kisiti ya da gunluk limit asimi
+            return [], "API uyarisi: " + (json.dumps(errors, ensure_ascii=False) if not isinstance(errors, str) else errors)
+        mac_listesi = js.get("response", [])
+        # Sadece oynanmis maclari al, en yeniden eskiye sirala
+        oynanan = [
+            m for m in mac_listesi
+            if isinstance(m, dict) and m.get("fixture", {}).get("status", {}).get("short") in ("FT", "AET", "PEN")
+        ]
+        oynanan.sort(key=lambda m: str(m.get("fixture", {}).get("date", "")), reverse=True)
+        return oynanan[:H2H_MAC_SAYISI], None
+    except Exception as e:
+        return [], "Baglanti hatasi: " + str(e)
 
 # --- KONTROL PANELİ ---
 st.sidebar.header("Kontrol Paneli")
@@ -105,6 +145,10 @@ if st.sidebar.button("Bulteni Yenile (Kredi Harcar)"):
         except Exception:
             pass
     st.rerun()
+
+if not ODDS_API_KEY:
+    st.error("ODDS_API_KEY bulunamadi. st.secrets veya ortam degiskeni olarak ekleyin.")
+    st.stop()
 
 maclar, is_cached = tum_liglerin_verisini_getir()
 
@@ -207,7 +251,7 @@ sim_sayisi = st.slider("Simulasyon Tekrar Sayisi:", 10000, 100000, 50000, step=1
 
 if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
     with st.spinner("Monte Carlo Skor Matrisi ve H2H Analizi Hesaplaniyor..."):
-        h2h_gecmis = h2h_ve_form_getir(ev, dep)
+        h2h_gecmis, h2h_hata = h2h_ve_form_getir(ev, dep)
         
         safe_avg_ev = avg_ev if avg_ev > 0 else 2.10
         safe_avg_ber = avg_ber if avg_ber > 0 else 3.20
@@ -335,23 +379,51 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
             st.subheader("İki Takım Arasındaki Geçmiş Maçlar (H2H)")
             if h2h_gecmis and isinstance(h2h_gecmis, list) and len(h2h_gecmis) > 0:
                 h2h_list = []
+                ev_galibiyet, beraberlik, dep_galibiyet = 0, 0, 0
+                toplam_gol_h2h = 0
                 for m in h2h_gecmis:
                     if isinstance(m, dict):
                         tarih = str(m.get("fixture", {}).get("date", ""))[:10]
+                        lig_adi = str(m.get("league", {}).get("name", ""))
                         teams = m.get("teams", {})
                         ev_t = str(teams.get("home", {}).get("name", "Ev"))
                         dep_t = str(teams.get("away", {}).get("name", "Dep"))
                         goals = m.get("goals", {})
-                        ev_g = str(goals.get("home", 0))
-                        dep_g = str(goals.get("away", 0))
-                        skor = ev_g + " - " + dep_g
-                        h2h_list.append({"Tarih": tarih, "Ev Sahibi": ev_t, "Skor": skor, "Deplasman": dep_t})
-                if h2h_list:
-                    st.table(pd.DataFrame(h2h_list))
-                else:
-                    st.warning("Eşleşen H2H verisi tablolandı fakat içerik boş.")
+                        eg = goals.get("home")
+                        dg = goals.get("away")
+                        eg = int(eg) if eg is not None else 0
+                        dg = int(dg) if dg is not None else 0
+                        toplam_gol_h2h += eg + dg
+                        # Secili maçtaki takimlar acisindan sonuc say
+                        if eg == dg:
+                            beraberlik += 1
+                        else:
+                            kazanan = ev_t if eg > dg else dep_t
+                            if kazanan == ev or ev.lower() in kazanan.lower() or kazanan.lower() in ev.lower():
+                                ev_galibiyet += 1
+                            else:
+                                dep_galibiyet += 1
+                        h2h_list.append({
+                            "Tarih": tarih,
+                            "Lig": lig_adi,
+                            "Ev Sahibi": ev_t,
+                            "Skor": str(eg) + " - " + str(dg),
+                            "Deplasman": dep_t
+                        })
+                n = len(h2h_list)
+                if n < H2H_MAC_SAYISI:
+                    st.warning("Bu iki takım arasında API'de " + str(n) + " oynanmış maç bulundu (hedef: " + str(H2H_MAC_SAYISI) + "). Ücretsiz planda erişilebilen sezonlar sınırlı olabilir.")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric(ev + " Galibiyet", ev_galibiyet)
+                c2.metric("Beraberlik", beraberlik)
+                c3.metric(dep + " Galibiyet", dep_galibiyet)
+                c4.metric("Maç Başı Gol", f"{toplam_gol_h2h / n:.2f}" if n else "-")
+                st.table(pd.DataFrame(h2h_list))
             else:
-                st.info("Bu iki takım için API arşivinde doğrudan H2H kaydı bulunamadı. Sol paneldeki 'H2H Ağırlık Çarpanı' ile simülasyonu manuel yönlendirebilirsiniz.")
+                if h2h_hata:
+                    st.warning("H2H verisi alınamadı: " + h2h_hata)
+                else:
+                    st.info("Bu iki takım için API arşivinde doğrudan H2H kaydı bulunamadı. Sol paneldeki 'H2H Ağırlık Çarpanı' ile simülasyonu manuel yönlendirebilirsiniz.")
 
         with tab4:
             st.subheader("Degerli Bahis (Value Bet) Firsatlari")
