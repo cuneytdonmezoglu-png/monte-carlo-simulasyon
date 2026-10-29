@@ -117,8 +117,11 @@ for bm in bookmakers:
             b = next((i['price'] for i in mkt['outcomes'] if i['name'] == 'Draw'), None)
             d = next((i['price'] for i in mkt['outcomes'] if i['name'] == dep), None)
             if e and b and d:
-                ev_o.append(e); ber_o.append(b); dep_o.append(d)
+                ev_o.append(e)
+                ber_o.append(b)
+                dep_o.append(d)
                 buro_detaylari.append({"Büro": b_name, "MS 1": e, "MS X": b, "MS 2": d})
 
 avg_ev = np.mean(ev_o) if ev_o else 2.00
-avg_ber = np.mean(ber_o) if ber_o else
+avg_ber = np.mean(ber_o) if ber_o else 3.20
+avg_dep = np.mean(dep_o) if dep_o else 3.5
