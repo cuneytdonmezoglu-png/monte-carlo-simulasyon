@@ -28,12 +28,10 @@ LIGLER = [
 def tum_liglerin_verisini_getir():
     if os.path.exists(CACHE_FILE):
         try:
-            dosya_tarihi = datetime.fromtimestamp(os.path.getmtime(CACHE_FILE)).date()
-            if dosya_tarihi == datetime.now().date():
-                with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if data:
-                        return data, True
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    return data, True
         except Exception:
             pass
 
@@ -44,7 +42,9 @@ def tum_liglerin_verisini_getir():
         try:
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
-                tum_maclar.extend(res.json())
+                json_data = res.json()
+                if isinstance(json_data, list):
+                    tum_maclar.extend(json_data)
         except Exception:
             pass
         pbar.progress((idx + 1) / len(LIGLER))
@@ -110,10 +110,4 @@ if st.sidebar.button("🔄 Bülteni Yenile (1 Kredi)"):
 maclar, is_cached = tum_liglerin_verisini_getir()
 
 if is_cached:
-    st.sidebar.success(f"🛡️ Yüklü Maç Sayısı: {len(maclar)} (Kredi Harcanmıyor)")
-else:
-    st.sidebar.info("🌐 Taze Bülten Çekildi")
-
-if not maclar:
-    st.warning("Aktif maç verisi bulunamadı veya lig sorgusu çekilemedi. Lütfen 'Bülteni Yenile' butonuna basın.")
-    st
+    st.sidebar.success(f"🛡
