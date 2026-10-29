@@ -89,5 +89,4 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
         if ev_id and dep_id:
             h2h_url = f"https://api-football-v1.p.rapidapi.com/v3/fixtures/headtohead?h2h={ev_id}-{dep_id}"
             res_h2h = requests.get(h2h_url, headers=headers, timeout=5)
-            if res_h2h.status_code == 200:
-                return res_h2h.json().get('
+            if res_h2h.status_code
