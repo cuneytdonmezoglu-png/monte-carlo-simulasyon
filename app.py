@@ -121,16 +121,4 @@ for bm in bookmakers:
                 buro_detaylari.append({"Büro": b_name, "MS 1": e, "MS X": b, "MS 2": d})
 
 avg_ev = np.mean(ev_o) if ev_o else 2.00
-avg_ber = np.mean(ber_o) if ber_o else 3.20
-avg_dep = np.mean(dep_o) if dep_o else 3.50
-
-max_ev = max(ev_o) if ev_o else avg_ev
-max_ber = max(ber_o) if ber_o else avg_ber
-max_dep = max(dep_o) if dep_o else avg_dep
-
-# --- SAKATLIK & H2H DİNAMİK PARAMETRELERİ ---
-st.sidebar.markdown("---")
-st.sidebar.header("⚙️ Kadro & H2H İnce Ayarları")
-h2h_weight = st.sidebar.slider("H2H / Geçmiş Maç Ağırlık Çarpanı", -30, 30, 0, help="Geçmiş H2H üstünlüğünü simülasyona manuel ekler/çıkarır.")
-ev_eksik = st.sidebar.slider(f"{ev} Sakat/Eksik Oyuncu Etkisi (%)", 0, 40, 0, step=5)
-dep_eksik = st.sidebar.slider(
+avg_ber = np.mean(ber_o) if ber_o else
