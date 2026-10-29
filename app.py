@@ -15,21 +15,27 @@ CACHE_FILE = "maclar_cache.json"
 st.title("⚽ Profesyonel Futbol Monte Carlo, H2H & Kadro Analiz Paneli")
 
 LIGLER = [
-    "soccer_turkey_super_league", "soccer_turkey_cup",
-    "soccer_epl", "soccer_fa_cup", "soccer_england_efl_cup",
-    "soccer_spain_la_liga", "soccer_spain_copa_del_rey",
-    "soccer_italy_serie_a", "soccer_italy_coppa_italia",
-    "soccer_germany_bundesliga", "soccer_germany_dfb_pokal",
+    "soccer_turkey_super_league",
+    "soccer_epl",
+    "soccer_spain_la_liga",
+    "soccer_italy_serie_a",
+    "soccer_germany_bundesliga",
     "soccer_france_ligue_one",
-    "soccer_uefa_champs_league", "soccer_uefa_europa_league", "soccer_uefa_europa_conference_league"
+    "soccer_uefa_champs_league",
+    "soccer_uefa_europa_league"
 ]
 
 def tum_liglerin_verisini_getir():
     if os.path.exists(CACHE_FILE):
-        dosya_tarihi = datetime.fromtimestamp(os.path.getmtime(CACHE_FILE)).date()
-        if dosya_tarihi == datetime.now().date():
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f), True
+        try:
+            dosya_tarihi = datetime.fromtimestamp(os.path.getmtime(CACHE_FILE)).date()
+            if dosya_tarihi == datetime.now().date():
+                with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if data:
+                        return data, True
+        except Exception:
+            pass
 
     tum_maclar = []
     pbar = st.progress(0)
@@ -75,7 +81,6 @@ def takim_id_bul(takim_adi, headers):
             pass
     return None
 
-# --- API-FOOTBALL OTOMATİK H2H BİLGİSİ ---
 @st.cache_data(ttl=86400)
 def h2h_ve_form_getir(ev_takim, dep_takim):
     headers = {
@@ -90,10 +95,25 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
             h2h_url = f"https://api-football-v1.p.rapidapi.com/v3/fixtures/headtohead?h2h={ev_id}-{dep_id}"
             res_h2h = requests.get(h2h_url, headers=headers, timeout=5)
             if res_h2h.status_code == 200:
-                d = res_h2h.json().get("response", [])
-                return d[:10]
+                return res_h2h.json().get("response", [])[:10]
     except Exception:
         pass
     return []
 
 # --- KONTROL PANELİ ---
+st.sidebar.header("🕹️ Kontrol Paneli")
+if st.sidebar.button("🔄 Bülteni Yenile (1 Kredi)"):
+    if os.path.exists(CACHE_FILE):
+        os.remove(CACHE_FILE)
+    st.rerun()
+
+maclar, is_cached = tum_liglerin_verisini_getir()
+
+if is_cached:
+    st.sidebar.success(f"🛡️ Yüklü Maç Sayısı: {len(maclar)} (Kredi Harcanmıyor)")
+else:
+    st.sidebar.info("🌐 Taze Bülten Çekildi")
+
+if not maclar:
+    st.warning("Aktif maç verisi bulunamadı veya lig sorgusu çekilemedi. Lütfen 'Bülteni Yenile' butonuna basın.")
+    st
