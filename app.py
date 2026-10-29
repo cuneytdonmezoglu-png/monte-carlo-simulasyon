@@ -101,8 +101,8 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
     return []
 
 # --- KONTROL PANELİ ---
-st.sidebar.header("🕹️ Kontrol Paneli")
-if st.sidebar.button("🔄 Bülteni Yenile (1 Kredi)"):
+st.sidebar.header("Kontrol Paneli")
+if st.sidebar.button("Bülteni Yenile"):
     if os.path.exists(CACHE_FILE):
         os.remove(CACHE_FILE)
     st.rerun()
@@ -110,4 +110,9 @@ if st.sidebar.button("🔄 Bülteni Yenile (1 Kredi)"):
 maclar, is_cached = tum_liglerin_verisini_getir()
 
 if is_cached:
-    st.sidebar.success(f"🛡
+    st.sidebar.success(f"Yuklu Mac Sayisi: {len(maclar)} (Kredi Harcanmiyor)")
+else:
+    st.sidebar.info("Taze Bulten Cekildi")
+
+if not maclar or len(maclar) == 0:
+    st.error
