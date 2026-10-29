@@ -51,6 +51,15 @@ def tum_liglerin_verisini_getir():
 
     return [], False
 
+def takim_ismini_temizle(isim):
+    # API aramalarında sponsor/ek takı isimlerini temizler
+    gereksiz_kelimeler = ["Torku ", "Atiker ", "Yukatel ", "Bitexen ", "Mondihome ", "Öznur Kablo ", "Rams ", "Corendon "]
+    temiz_isim = isim
+    for g in gereksiz_kelimeler:
+        temiz_isim = temiz_isim.replace(g, "")
+    return temiz_isim.strip()
+
+# --- API-FOOTBALL OTOMATİK H2H BİLGİSİ ---
 @st.cache_data(ttl=86400)
 def h2h_ve_form_getir(ev_takim, dep_takim):
     headers = {
@@ -58,8 +67,11 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
         "x-rapidapi-host": "api-football-v1.p.rapidapi.com"
     }
     try:
-        res_ev = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={ev_takim}", headers=headers, timeout=5)
-        res_dep = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={dep_takim}", headers=headers, timeout=5)
+        ev_search = takim_ismini_temizle(ev_takim)
+        dep_search = takim_ismini_temizle(dep_takim)
+
+        res_ev = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={ev_search}", headers=headers, timeout=5)
+        res_dep = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={dep_search}", headers=headers, timeout=5)
         
         if res_ev.status_code == 200 and res_dep.status_code == 200:
             d_ev = res_ev.json().get('response', [])
