@@ -13,10 +13,23 @@ CACHE_FILE = "maclar_cache.json"
 
 st.title("⚽ Profesyonel Futbol Monte Carlo & Value Bet Paneli")
 
+# --- KUPA VE GENİŞ LİG LİSTESİ ---
 LIGLER = [
-    "soccer_turkey_super_league", "soccer_epl", "soccer_spain_la_liga",
-    "soccer_italy_serie_a", "soccer_germany_bundesliga", "soccer_france_ligue_one",
-    "soccer_uefa_champs_league", "soccer_uefa_europa_league"
+    "soccer_turkey_super_league",
+    "soccer_turkey_cup",                # Türkiye Kupası
+    "soccer_epl",                       # İngiltere Premier
+    "soccer_fa_cup",                    # FA Cup
+    "soccer_england_efl_cup",           # League Cup
+    "soccer_spain_la_liga",
+    "soccer_spain_copa_del_rey",        # İspanya Kupası
+    "soccer_italy_serie_a",
+    "soccer_italy_coppa_italia",        # İtalya Kupası
+    "soccer_germany_bundesliga",
+    "soccer_germany_dfb_pokal",         # Almanya Kupası
+    "soccer_france_ligue_one",
+    "soccer_uefa_champs_league",        # Şampiyonlar Ligi
+    "soccer_uefa_europa_league",       # Avrupa Ligi
+    "soccer_uefa_europa_conference_league" # Konferans Ligi
 ]
 
 def tum_liglerin_verisini_getir():
@@ -31,10 +44,10 @@ def tum_liglerin_verisini_getir():
     for idx, lig in enumerate(LIGLER):
         url = f'https://api.the-odds-api.com/v4/sports/{lig}/odds/?apiKey={API_KEY}&regions=eu&markets=h2h'
         try:
-            res = requests.get(url)
+            res = requests.get(url, timeout=5)
             if res.status_code == 200:
                 tum_maclar.extend(res.json())
-        except:
+        except Exception:
             pass
         pbar.progress((idx + 1) / len(LIGLER))
     pbar.empty()
@@ -45,8 +58,11 @@ def tum_liglerin_verisini_getir():
         return tum_maclar, False
 
     fallback_url = f'https://api.the-odds-api.com/v4/sports/soccer/odds/?apiKey={API_KEY}&regions=eu&markets=h2h'
-    res = requests.get(fallback_url)
-    return (res.json() if res.status_code == 200 else []), False
+    try:
+        res = requests.get(fallback_url, timeout=5)
+        return (res.json() if res.status_code == 200 else []), False
+    except Exception:
+        return [], False
 
 # --- SIDEBAR CONTROL ---
 st.sidebar.header("🕹️ Kontrol Paneli")
@@ -227,4 +243,7 @@ if st.button("🚀 50.000 Maçlık Detaylı Simülasyonu Başlat", type="primary
 
         with tab5:
             st.subheader("🌐 Yabancı Büroların Canlı Oran Listesi")
-            st.dataframe(pd.DataFrame(buro_detaylari))
+            if buro_detaylari:
+                st.dataframe(pd.DataFrame(buro_detaylari))
+            else:
+                st.info("Büro detayı bulunamadı.")
