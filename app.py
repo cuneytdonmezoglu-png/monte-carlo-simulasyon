@@ -51,13 +51,18 @@ def tum_liglerin_verisini_getir():
     pbar.empty()
 
     if tum_maclar:
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(tum_maclar, f, ensure_ascii=False, indent=4)
+        try:
+            with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(tum_maclar, f, ensure_ascii=False, indent=4)
+        except Exception:
+            pass
         return tum_maclar, False
 
     return [], False
 
 def metni_temizle(metin):
+    if not isinstance(metin, str):
+        return "", []
     tr_map = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
     temiz = metin.translate(tr_map)
     gereksiz = ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Oznur", "Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC", "BB"]
@@ -73,7 +78,7 @@ def takim_id_bul(takim_adi, headers):
     if kelimeler:
         arama_listesi.append(kelimeler[-1])
         arama_listesi.append(kelimeler[0])
-    arama_listesi.append(takim_adi)
+    arama_listesi.append(str(takim_adi))
     
     benzersiz_sorgular = list(dict.fromkeys([s.strip() for s in arama_listesi if len(s.strip()) > 2]))
 
@@ -83,7 +88,7 @@ def takim_id_bul(takim_adi, headers):
             res = requests.get(url, headers=headers, timeout=4)
             if res.status_code == 200:
                 data = res.json().get("response", [])
-                if data:
+                if data and isinstance(data, list) and len(data) > 0:
                     return data[0]["team"]["id"]
         except Exception:
             pass
@@ -112,7 +117,10 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
 st.sidebar.header("Kontrol Paneli")
 if st.sidebar.button("Bulteni Yenile"):
     if os.path.exists(CACHE_FILE):
-        os.remove(CACHE_FILE)
+        try:
+            os.remove(CACHE_FILE)
+        except Exception:
+            pass
     st.rerun()
 
 maclar, is_cached = tum_liglerin_verisini_getir()
@@ -126,4 +134,35 @@ if not maclar or len(maclar) == 0:
     st.error("Bulten verisi cekilemedi veya aktif mac bulunamadi.")
     st.stop()
 
-# --- GÜVENL
+# --- MAÇ SEÇİMİ ---
+gecerli_maclar = []
+mac_listesi = []
+
+for m in maclar:
+    if isinstance(m, dict) and "home_team" in m and "away_team" in m:
+        home = m.get("home_team", "Ev")
+        away = m.get("away_team", "Dep")
+        sport = m.get("sport_title", "Futbol")
+        mac_listesi.append(str(sport) + ": " + str(home) + " vs " + str(away))
+        gecerli_maclar.append(m)
+
+if not gecerli_maclar:
+    st.error("Onbellekteki mac verisinin bicimi uyumsuz.")
+    st.stop()
+
+secilen_str = st.selectbox("Simule Etmek Istedigin Maci Sec:", mac_listesi)
+secilen_mac = gecerli_maclar[mac_listesi.index(secilen_str)]
+
+ev = str(secilen_mac.get("home_team", "Ev"))
+dep = str(secilen_mac.get("away_team", "Deplasman"))
+
+# Oranları Çek
+bookmakers = secilen_mac.get("bookmakers", [])
+ev_o, ber_o, dep_o, buro_detaylari = [], [], [], []
+
+if isinstance(bookmakers, list):
+    for bm in bookmakers:
+        if isinstance(bm, dict):
+            b_name = bm.get("title", "Buro")
+            for mkt in bm.get("markets", []):
+                if isinstance(mkt
