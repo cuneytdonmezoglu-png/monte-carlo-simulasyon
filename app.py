@@ -60,7 +60,7 @@ def tum_liglerin_verisini_getir():
 def metni_temizle(metin):
     tr_map = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
     temiz = metin.translate(tr_map)
-    gereksiz = ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Oznur", "Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC"]
+    gereksiz = ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Oznur", "Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC", "BB"]
     kelimeler = [k for k in temiz.split() if k not in gereksiz]
     sade = " ".join(kelimeler)
     return sade, kelimeler
@@ -126,38 +126,4 @@ if not maclar or len(maclar) == 0:
     st.error("Bulten verisi cekilemedi veya aktif mac bulunamadi.")
     st.stop()
 
-# --- GÜVENLİ MAÇ SEÇİMİ ---
-gecerli_maclar = []
-mac_listesi = []
-
-for m in maclar:
-    if isinstance(m, dict) and "home_team" in m and "away_team" in m:
-        home = m.get("home_team", "Ev")
-        away = m.get("away_team", "Dep")
-        sport = m.get("sport_title", "Futbol")
-        mac_listesi.append(str(sport) + ": " + str(home) + " vs " + str(away))
-        gecerli_maclar.append(m)
-
-if not gecerli_maclar:
-    st.error("Onbellekteki mac verisinin bicimi uyumsuz.")
-    st.stop()
-
-secilen_str = st.selectbox("Simule Etmek Istedigin Maci Sec:", mac_listesi)
-secilen_mac = gecerli_maclar[mac_listesi.index(secilen_str)]
-
-ev = secilen_mac.get("home_team", "Ev")
-dep = secilen_mac.get("away_team", "Deplasman")
-
-# Oranları Çek
-bookmakers = secilen_mac.get("bookmakers", [])
-ev_o, ber_o, dep_o, buro_detaylari = [], [], [], []
-
-if isinstance(bookmakers, list):
-    for bm in bookmakers:
-        if isinstance(bm, dict):
-            b_name = bm.get("title", "Buro")
-            for mkt in bm.get("markets", []):
-                if isinstance(mkt, dict) and mkt.get("key") == "h2h":
-                    outcomes = mkt.get("outcomes", [])
-                    e = next((i["price"] for i in outcomes if isinstance(i, dict) and i.get("name") == ev), None)
-                    b = next
+# --- GÜVENL
