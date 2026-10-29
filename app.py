@@ -51,13 +51,30 @@ def tum_liglerin_verisini_getir():
 
     return [], False
 
-def takim_ismini_temizle(isim):
-    # API aramalarında sponsor/ek takı isimlerini temizler
-    gereksiz_kelimeler = ["Torku ", "Atiker ", "Yukatel ", "Bitexen ", "Mondihome ", "Öznur Kablo ", "Rams ", "Corendon "]
-    temiz_isim = isim
-    for g in gereksiz_kelimeler:
-        temiz_isim = temiz_isim.replace(g, "")
-    return temiz_isim.strip()
+def takim_id_bul(takim_adi, headers):
+    # 1. Aşama: Temizlik
+    gereksiz = ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Öznur Kablo", "Rams", "Corendon", "SK", "FK"]
+    kelimeler = takim_adi.split()
+    temiz_kelimeler = [k for k in kelimeler if k not in gereksiz]
+    
+    arama_listesi = [
+        takim_adi,                             # Tam isim
+        " ".join(temiz_kelimeler),             # Temizlenmiş isim
+        temiz_kelimeler[-1] if temiz_kelimeler else takim_adi  # En ana kelime (Örn: Konyaspor)
+    ]
+    
+    for sorgu in arama_listesi:
+        if not sorgu:
+            continue
+        try:
+            res = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={sorgu}", headers=headers, timeout=4)
+            if res.status_code == 200:
+                data = res.json().get('response', [])
+                if data:
+                    return data[0]['team']['id']
+        except Exception:
+            pass
+    return None
 
 # --- API-FOOTBALL OTOMATİK H2H BİLGİSİ ---
 @st.cache_data(ttl=86400)
@@ -67,25 +84,14 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
         "x-rapidapi-host": "api-football-v1.p.rapidapi.com"
     }
     try:
-        ev_search = takim_ismini_temizle(ev_takim)
-        dep_search = takim_ismini_temizle(dep_takim)
-
-        res_ev = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={ev_search}", headers=headers, timeout=5)
-        res_dep = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={dep_search}", headers=headers, timeout=5)
+        ev_id = takim_id_bul(ev_takim, headers)
+        dep_id = takim_id_bul(dep_takim, headers)
         
-        if res_ev.status_code == 200 and res_dep.status_code == 200:
-            d_ev = res_ev.json().get('response', [])
-            d_dep = res_dep.json().get('response', [])
-            
-            if d_ev and d_dep:
-                ev_id = d_ev[0]['team']['id']
-                dep_id = d_dep[0]['team']['id']
-                
-                h2h_url = f"https://api-football-v1.p.rapidapi.com/v3/fixtures/headtohead?h2h={ev_id}-{dep_id}"
-                res_h2h = requests.get(h2h_url, headers=headers, timeout=5)
-                
-                if res_h2h.status_code == 200:
-                    return res_h2h.json().get('response', [])[:10]
+        if ev_id and dep_id:
+            h2h_url = f"https://api-football-v1.p.rapidapi.com/v3/fixtures/headtohead?h2h={ev_id}-{dep_id}"
+            res_h2h = requests.get(h2h_url, headers=headers, timeout=5)
+            if res_h2h.status_code == 200:
+                return res_h2h.json().get('response', [])[:10]
     except Exception:
         pass
     return []
@@ -163,130 +169,4 @@ if st.button("🚀 Detaylı Gelişmiş Simülasyonu Çalıştır", type="primary
         
         h_ev, h_ber, h_dep = 1/avg_ev, 1/avg_ber, 1/avg_dep
         toplam = h_ev + h_ber + h_dep
-        p_ev, p_dep = h_ev/toplam, h_dep/toplam
-
-        base_ev_xg = -np.log(1 - p_ev) * 1.35
-        base_dep_xg = -np.log(1 - p_dep) * 1.10
-
-        ev_xg = max(0.2, np.round(base_ev_xg * (1 + (h2h_weight / 100)) * (1 - (ev_eksik / 100)), 2))
-        dep_xg = max(0.2, np.round(base_dep_xg * (1 - (h2h_weight / 100)) * (1 - (dep_eksik / 100)), 2))
-
-        e_gol = np.random.poisson(ev_xg, sim_sayisi)
-        d_gol = np.random.poisson(dep_xg, sim_sayisi)
-
-        e_iy = np.random.poisson(ev_xg * 0.43, sim_sayisi)
-        d_iy = np.random.poisson(dep_xg * 0.43, sim_sayisi)
-
-        dilim_xg = (ev_xg + dep_xg) / 6
-        d_0_15 = np.random.poisson(dilim_xg, sim_sayisi)
-        d_15_30 = np.random.poisson(dilim_xg, sim_sayisi)
-        d_30_45 = np.random.poisson(dilim_xg * 1.1, sim_sayisi)
-        d_45_60 = np.random.poisson(dilim_xg, sim_sayisi)
-        d_60_75 = np.random.poisson(dilim_xg * 1.2, sim_sayisi)
-        d_75_90 = np.random.poisson(dilim_xg * 1.3, sim_sayisi)
-
-        ms1 = np.sum(e_gol > d_gol) / sim_sayisi * 100
-        msX = np.sum(e_gol == d_gol) / sim_sayisi * 100
-        ms2 = np.sum(e_gol < d_gol) / sim_sayisi * 100
-
-        fair_ms1 = 100 / ms1 if ms1 > 0 else 99
-        fair_msX = 100 / msX if msX > 0 else 99
-        fair_ms2 = 100 / ms2 if ms2 > 0 else 99
-
-        iy1 = np.sum(e_iy > d_iy) / sim_sayisi * 100
-        iyX = np.sum(e_iy == d_iy) / sim_sayisi * 100
-        iy2 = np.sum(e_iy < d_iy) / sim_sayisi * 100
-
-        iy_gol_var = np.sum((e_iy + d_iy) > 0.5) / sim_sayisi * 100
-        toplam_gol = e_gol + d_gol
-        ust25 = np.sum(toplam_gol > 2.5) / sim_sayisi * 100
-
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "📊 Maç Sonu & İY",
-            "⏱️ Gol Dakikaları & İY Gol",
-            "📜 Geçmiş H2H Maçları",
-            "💎 Value Bet & Kadro",
-            "🌐 Yabancı Bürolar"
-        ])
-
-        with tab1:
-            st.subheader("Maç Sonu ve İlk Yarı Dağılımları")
-            st.info(f"💡 Modifiye Gol Beklentileri (xG) -> {ev}: {ev_xg:.2f} | {dep}: {dep_xg:.2f}")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.write("### Maç Sonucu (MS)")
-                df_ms = pd.DataFrame({
-                    "Seçenek": ["MS 1", "MS X", "MS 2"],
-                    "Olasılık (%)": [ms1, msX, ms2],
-                    "Adil Oran": [fair_ms1, fair_msX, fair_ms2]
-                })
-                st.dataframe(df_ms.style.format({"Olasılık (%)": "{:.1f}%", "Adil Oran": "{:.2f}"}))
-
-            with c2:
-                st.write("### İlk Yarı Sonucu (İY)")
-                df_iy = pd.DataFrame({
-                    "Seçenek": ["İY 1", "İY X", "İY 2"],
-                    "Olasılık (%)": [iy1, iyX, iy2],
-                    "Adil Oran": [100/iy1, 100/iyX, 100/iy2]
-                })
-                st.dataframe(df_iy.style.format({"Olasılık (%)": "{:.1f}%", "Adil Oran": "{:.2f}"}))
-
-        with tab2:
-            st.subheader("⏱️ Zaman Dilimlerine Göre Gol Olasılıkları")
-            col_z1, col_z2 = st.columns(2)
-            with col_z1:
-                st.metric("İlk Yarı 0.5 Gol Üst", f"%{iy_gol_var:.1f}", f"Adil Oran: {100/iy_gol_var:.2f}")
-                st.metric("Maç Geneli 2.5 Gol Üst", f"%{ust25:.1f}", f"Adil Oran: {100/ust25:.2f}")
-
-            with col_z2:
-                df_dilim = pd.DataFrame({
-                    "Zaman Aralığı": ["0-15 dk", "15-30 dk", "30-45+ dk", "45-60 dk", "60-75 dk", "75-90+ dk"],
-                    "Gol Olasılığı (%)": [
-                        np.sum(d_0_15 > 0)/sim_sayisi*100,
-                        np.sum(d_15_30 > 0)/sim_sayisi*100,
-                        np.sum(d_30_45 > 0)/sim_sayisi*100,
-                        np.sum(d_45_60 > 0)/sim_sayisi*100,
-                        np.sum(d_60_75 > 0)/sim_sayisi*100,
-                        np.sum(d_75_90 > 0)/sim_sayisi*100
-                    ]
-                })
-                st.dataframe(df_dilim.style.format({"Gol Olasılığı (%)": "{:.1f}%"}))
-
-        with tab3:
-            st.subheader("📜 İki Takım Arasındaki Son H2H Maçlar (API-Football)")
-            if h2h_gecmis:
-                h2h_list = []
-                for m in h2h_gecmis:
-                    tarih = m['fixture']['date'][:10]
-                    ev_t = m['teams']['home']['name']
-                    dep_t = m['teams']['away']['name']
-                    skor = f"{m['goals']['home']} - {m['goals']['away']}"
-                    h2h_list.append({"Tarih": tarih, "Ev Sahibi": ev_t, "Skor": skor, "Deplasman": dep_t})
-                st.table(pd.DataFrame(h2h_list))
-            else:
-                st.warning("API üzerinde doğrudan eşleşen otomatik H2H kaydı bulunamadı. Sol paneldeki H2H slider'ını kullanabilirsiniz.")
-
-        with tab4:
-            st.subheader("💎 Değerli Bahis (Value Bet) Fırsatları")
-            val_1 = max_ev > fair_ms1
-            val_X = max_ber > fair_msX
-            val_2 = max_dep > fair_ms2
-
-            df_val = pd.DataFrame({
-                "Seçenek": ["MS 1", "MS X", "MS 2"],
-                "Simülasyon Adil Oranı": [f"{fair_ms1:.2f}", f"{fair_msX:.2f}", f"{fair_ms2:.2f}"],
-                "Piyasa En Yüksek Oran": [f"{max_ev:.2f}", f"{max_ber:.2f}", f"{max_dep:.2f}"],
-                "Value Durumu": [
-                    "🔥 DEĞERLİ" if val_1 else "Nötr",
-                    "🔥 DEĞERLİ" if val_X else "Nötr",
-                    "🔥 DEĞERLİ" if val_2 else "Nötr"
-                ]
-            })
-            st.table(df_val)
-
-        with tab5:
-            st.subheader("🌐 Yabancı Büroların Canlı Oran Listesi")
-            if buro_detaylari:
-                st.dataframe(pd.DataFrame(buro_detaylari))
-            else:
-                st.info("Büro detayı bulunamadı.")
+        p_ev, p_dep = h_ev/top
