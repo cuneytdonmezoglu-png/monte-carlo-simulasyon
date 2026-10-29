@@ -155,4 +155,8 @@ if isinstance(bookmakers, list):
         if isinstance(bm, dict):
             b_name = bm.get("title", "Buro")
             for mkt in bm.get("markets", []):
-                if isinstance(mkt, dict) and mkt.get("key") == "h2
+                if isinstance(mkt, dict) and mkt.get("key") == "h2h":
+                    outcomes = mkt.get("outcomes", [])
+                    e = next((i["price"] for i in outcomes if isinstance(i, dict) and i.get("name") == ev), None)
+                    b = next((i["price"] for i in outcomes if isinstance(i, dict) and i.get("name") == "Draw"), None)
+                    d = next((i["price"] for i in outcomes
