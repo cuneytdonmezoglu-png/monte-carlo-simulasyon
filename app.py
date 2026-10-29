@@ -372,4 +372,16 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
             st.table(df_val)
 
         with tab5:
-            st.subheader("Yabanci Burolarin Canli Oran List
+            st.subheader("Yabanci Burolarin Canli Oran Listesi")
+            if buro_detaylari:
+                df_buro = pd.DataFrame(buro_detaylari)
+                st.dataframe(
+                    df_buro.style.format({"MS 1": "{:.2f}", "MS X": "{:.2f}", "MS 2": "{:.2f}"}),
+                    use_container_width=True
+                )
+                st.caption(
+                    "Toplam " + str(len(df_buro)) + " buro | "
+                    "En yuksek -> MS 1: " + f"{max_ev:.2f}" + " | MS X: " + f"{max_ber:.2f}" + " | MS 2: " + f"{max_dep:.2f}"
+                )
+            else:
+                st.info("Bu mac icin yabanci buro orani bulunamadi.")
