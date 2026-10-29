@@ -6,13 +6,13 @@ import json
 import os
 from datetime import datetime
 
-st.set_page_config(page_title="Pro Monte Carlo Analytics", page_icon="⚽", layout="wide")
+st.set_page_config(page_title="Pro Monte Carlo & Skor Analiz Paneli", page_icon="⚽", layout="wide")
 
 ODDS_API_KEY = "f6649c5150399729774787d9fac15cbb"
 RAPID_API_KEY = "0a912cbbe6msh15ad4f09e04d7a8p1c1967jsn3d1970aec964"
 CACHE_FILE = "maclar_cache.json"
 
-st.title("⚽ Profesyonel Futbol Monte Carlo, H2H & Kadro Analiz Paneli")
+st.title("⚽ Profesyonel Futbol Monte Carlo, Skor Tahmin & H2H Paneli")
 
 LIGLER = [
     "soccer_turkey_super_league",
@@ -63,29 +63,16 @@ def tum_liglerin_verisini_getir():
 def takim_id_bul(takim_adi, headers):
     if not isinstance(takim_adi, str):
         return None
+    # Takım adından en karakteristik kelimeyi al (Örn: "Torku Konyaspor" -> "Konyaspor")
+    parcalar = [p.strip() for p in takim_adi.split() if len(p.strip()) > 2]
+    arama_terimi = parcalar[-1] if parcalar else takim_adi
     
-    # Sponsor ve ekleri temizle, doğrudan ana kulüp adını bırak
-    temiz = takim_adi
-    for g in ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Oznur", "Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC", "BB"]:
-        temiz = temiz.replace(g, "")
-    
-    kelimeler = [k.strip() for k in temiz.split() if len(k.strip()) > 2]
-    ana_kelime = kelimeler[-1] if kelimeler else takim_adi
-
-    # Doğrudan en karakteristik kelimeyle (Örn: Konyaspor, Galatasaray) RapidAPI'de arat
     try:
-        url = "https://api-football-v1.p.rapidapi.com/v3/teams?search=" + ana_kelime
+        url = "https://api-football-v1.p.rapidapi.com/v3/teams?search=" + arama_terimi
         res = requests.get(url, headers=headers, timeout=4)
         if res.status_code == 200:
             data = res.json().get("response", [])
-            if data and isinstance(data, list):
-                for item in data:
-                    t_info = item.get("team", {})
-                    t_name = t_info.get("name", "")
-                    # Eğer isimler uyuşuyorsa ID'yi direkt döndür
-                    if ana_kelime.lower() in t_name.lower() or t_name.lower() in takim_adi.lower():
-                        return t_info.get("id")
-                # Eşleşme olmazsa ilk bulunanın ID'sini ver
+            if data and isinstance(data, list) and len(data) > 0:
                 return data[0]["team"]["id"]
     except Exception:
         pass
@@ -217,7 +204,7 @@ dep_eksik = st.sidebar.slider(dep + " Sakat/Eksik Oyuncu Etkisi (%)", 0, 40, 0, 
 sim_sayisi = st.slider("Simulasyon Tekrar Sayisi:", 10000, 100000, 50000, step=10000)
 
 if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
-    with st.spinner("H2H Arsiv Verileri ve Monte Carlo Hesaplamasi Yapiliyor..."):
+    with st.spinner("Monte Carlo Skor Matrisi ve H2H Analizi Hesaplaniyor..."):
         h2h_gecmis = h2h_ve_form_getir(ev, dep)
         
         safe_avg_ev = avg_ev if avg_ev > 0 else 2.10
@@ -241,19 +228,24 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
         ev_xg = max(0.2, np.round(base_ev_xg * (1.0 + (h2h_weight / 100.0)) * (1.0 - (ev_eksik / 100.0)), 2))
         dep_xg = max(0.2, np.round(base_dep_xg * (1.0 - (h2h_weight / 100.0)) * (1.0 - (dep_eksik / 100.0)), 2))
 
+        # Poisson simülasyon dizileri
         e_gol = np.random.poisson(ev_xg, sim_sayisi)
         d_gol = np.random.poisson(dep_xg, sim_sayisi)
 
         e_iy = np.random.poisson(ev_xg * 0.43, sim_sayisi)
         d_iy = np.random.poisson(dep_xg * 0.43, sim_sayisi)
 
-        dilim_xg = (ev_xg + dep_xg) / 6.0
-        d_0_15 = np.random.poisson(dilim_xg, sim_sayisi)
-        d_15_30 = np.random.poisson(dilim_xg, sim_sayisi)
-        d_30_45 = np.random.poisson(dilim_xg * 1.1, sim_sayisi)
-        d_45_60 = np.random.poisson(dilim_xg, sim_sayisi)
-        d_60_75 = np.random.poisson(dilim_xg * 1.2, sim_sayisi)
-        d_75_90 = np.random.poisson(dilim_xg * 1.3, sim_sayisi)
+        # En Olası Skor Tahmin Matrisi Hesaplama
+        skor_sayaclari = {}
+        for eg, dg in zip(e_gol, d_gol):
+            skor_str = f"{eg} - {dg}"
+            skor_sayaclari[skor_str] = skor_sayaclari.get(skor_str, 0) + 1
+        
+         sirali_skorlar = sorted(skor_sayaclari.items(), key=lambda x: x[1], reverse=True)[:5]
+        en_olasi_skor_listesi = []
+        for skor_Str, adet in sirali_skorlar:
+            yuzde = (adet / sim_sayisi) * 100
+            en_olasi_skor_listesi.append({"Maç Skoru": skor_str, "Simülasyon Olasılığı (%)": f"%{yuzde:.2f}"})
 
         ms1 = float(np.sum(e_gol > d_gol)) / sim_sayisi * 100.0
         msX = float(np.sum(e_gol == d_gol)) / sim_sayisi * 100.0
@@ -279,34 +271,29 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
         fair_ust25 = 100.0 / ust25 if ust25 > 0.0 else 999.0
 
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "Mac Sonu & IY",
-            "Gol Dakikalari & IY Gol",
-            "Gecmis H2H Maclari",
-            "Value Bet & Kadro",
-            "Yabanci Burolar"
+            "🎯 Skor Tahminleri & MS",
+            "⏱️ Gol Dakikalari & IY",
+            "📊 Gecmis H2H Maclari",
+            "💎 Value Bet & Kadro",
+            "🌐 Yabanci Burolar"
         ])
 
         with tab1:
-            st.subheader("Mac Sonu ve Ilk Yari Dagilimlari")
-            st.info("Modifiye Gol Beklentileri (xG) -> " + ev + ": " + f"{ev_xg:.2f}" + " | " + dep + ": " + f"{dep_xg:.2f}")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.write("### Mac Sonucu (MS)")
+            st.subheader("🎯 En Olası Skor Tahminleri (Monte Carlo Matrisi)")
+            st.info(f"Modifiye Gol Beklentileri (xG) -> {ev}: {ev_xg:.2f} | {dep}: {dep_xg:.2f}")
+            
+            col_skor1, col_skor2 = st.columns(2)
+            with col_skor1:
+                st.write("### 🏆 En Muhtemel 5 Maç Skoru")
+                st.dataframe(pd.DataFrame(en_olasi_skor_listesi), use_container_width=True)
+            with col_skor2:
+                st.write("### 📈 Maç Sonucu (MS) Olasılıkları")
                 df_ms = pd.DataFrame({
-                    "Secenek": ["MS 1", "MS X", "MS 2"],
+                    "Secenek": ["MS 1 (" + ev + ")", "MS X (Beraberlik)", "MS 2 (" + dep + ")"],
                     "Olasilik (%)": [ms1, msX, ms2],
                     "Adil Oran": [fair_ms1, fair_msX, fair_ms2]
                 })
-                st.dataframe(df_ms.style.format({"Olasilik (%)": "{:.1f}%", "Adil Oran": "{:.2f}"}))
-
-            with c2:
-                st.write("### Ilk Yari Sonucu (IY)")
-                df_iy = pd.DataFrame({
-                    "Secenek": ["IY 1", "IY X", "IY 2"],
-                    "Olasilik (%)": [iy1, iyX, iy2],
-                    "Adil Oran": [fair_iy1, fair_iyX, fair_iy2]
-                })
-                st.dataframe(df_iy.style.format({"Olasilik (%)": "{:.1f}%", "Adil Oran": "{:.2f}"}))
+                st.dataframe(df_ms.style.format({"Olasilik (%)": "{:.1f}%", "Adil Oran": "{:.2f}"}), use_container_width=True)
 
         with tab2:
             st.subheader("Zaman Dilimlerine Gore Gol Olasiliklari")
@@ -314,8 +301,23 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
             with col_z1:
                 st.metric("Ilk Yari 0.5 Gol Ust", f"%{iy_gol_var:.1f}", "Adil Oran: " + f"{fair_iy_gol:.2f}")
                 st.metric("Mac Geneli 2.5 Gol Ust", f"%{ust25:.1f}", "Adil Oran: " + f"{fair_ust25:.2f}")
+                
+                df_iy = pd.DataFrame({
+                    "Secenek": ["IY 1", "IY X", "IY 2"],
+                    "Olasilik (%)": [iy1, iyX, iy2],
+                    "Adil Oran": [fair_iy1, fair_iyX, fair_iy2]
+                })
+                st.dataframe(df_iy.style.format({"Olasilik (%)": "{:.1f}%", "Adil Oran": "{:.2f}"}))
 
             with col_z2:
+                dilim_xg = (ev_xg + dep_xg) / 6.0
+                d_0_15 = np.random.poisson(dilim_xg, sim_sayisi)
+                d_15_30 = np.random.poisson(dilim_xg, sim_sayisi)
+                d_30_45 = np.random.poisson(dilim_xg * 1.1, sim_sayisi)
+                d_45_60 = np.random.poisson(dilim_xg, sim_sayisi)
+                d_60_75 = np.random.poisson(dilim_xg * 1.2, sim_sayisi)
+                d_75_90 = np.random.poisson(dilim_xg * 1.3, sim_sayisi)
+
                 df_dilim = pd.DataFrame({
                     "Zaman Araligi": ["0-15 dk", "15-30 dk", "30-45+ dk", "45-60 dk", "60-75 dk", "75-90+ dk"],
                     "Gol Olasiligi (%)": [
@@ -330,48 +332,5 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
                 st.dataframe(df_dilim.style.format({"Gol Olasiligi (%)": "{:.1f}%"}))
 
         with tab3:
-            st.subheader("Iki Takim Arasindaki Son H2H Maclar (API-Football)")
-            if h2h_gecmis and isinstance(h2h_gecmis, list) and len(h2h_gecmis) > 0:
-                h2h_list = []
-                for m in h2h_gecmis:
-                    if isinstance(m, dict):
-                        tarih = str(m.get("fixture", {}).get("date", ""))[:10]
-                        teams = m.get("teams", {})
-                        ev_t = str(teams.get("home", {}).get("name", "Ev"))
-                        dep_t = str(teams.get("away", {}).get("name", "Dep"))
-                        goals = m.get("goals", {})
-                        ev_g = str(goals.get("home", 0))
-                        dep_g = str(goals.get("away", 0))
-                        skor = ev_g + " - " + dep_g
-                        h2h_list.append({"Tarih": tarih, "Ev Sahibi": ev_t, "Skor": skor, "Deplasman": dep_t})
-                if h2h_list:
-                    st.table(pd.DataFrame(h2h_list))
-                else:
-                    st.warning("Eşleşen maç verisi ayrıştırılamadı.")
-            else:
-                st.warning("API uzerinde dogrudan eslesen otomatik H2H kaydi bulunamadi. Sol paneldeki H2H slider'ini kullanabilirsiniz.")
-
-        with tab4:
-            st.subheader("Degerli Bahis (Value Bet) Firsatlari")
-            val_1 = max_ev > fair_ms1
-            val_X = max_ber > fair_msX
-            val_2 = max_dep > fair_ms2
-
-            df_val = pd.DataFrame({
-                "Secenek": ["MS 1", "MS X", "MS 2"],
-                "Simulasyon Adil Orani": [f"{fair_ms1:.2f}", f"{fair_msX:.2f}", f"{fair_ms2:.2f}"],
-                "Piyasa En Yuksek Oran": [f"{max_ev:.2f}", f"{max_ber:.2f}", f"{max_dep:.2f}"],
-                "Value Durumu": [
-                    "DEGERLI" if val_1 else "Notr",
-                    "DEGERLI" if val_X else "Notr",
-                    "DEGERLI" if val_2 else "Notr"
-                ]
-            })
-            st.table(df_val)
-
-        with tab5:
-            st.subheader("Yabanci Burolarin Canli Oran Listesi")
-            if buro_detaylari and len(buro_detaylari) > 0:
-                st.dataframe(pd.DataFrame(buro_detaylari))
-            else:
-                st.info("Bu mac icin buro detay orani bulunamadi.")
+            st.subheader("İki Takım Arasındaki Geçmiş Maçlar (H2H)")
+            if h2h_gecmis and isinstance
