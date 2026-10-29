@@ -34,7 +34,7 @@ def tum_liglerin_verisini_getir():
     tum_maclar = []
     pbar = st.progress(0)
     for idx, lig in enumerate(LIGLER):
-        url = f'https://api.the-odds-api.com/v4/sports/{lig}/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h'
+        url = f"https://api.the-odds-api.com/v4/sports/{lig}/odds/?apiKey={ODDS_API_KEY}&regions=eu&markets=h2h"
         try:
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
@@ -68,9 +68,9 @@ def takim_id_bul(takim_adi, headers):
         try:
             res = requests.get(f"https://api-football-v1.p.rapidapi.com/v3/teams?search={sorgu}", headers=headers, timeout=4)
             if res.status_code == 200:
-                data = res.json().get('response', [])
+                data = res.json().get("response", [])
                 if data:
-                    return data[0]['team']['id']
+                    return data[0]["team"]["id"]
         except Exception:
             pass
     return None
@@ -89,4 +89,21 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
         if ev_id and dep_id:
             h2h_url = f"https://api-football-v1.p.rapidapi.com/v3/fixtures/headtohead?h2h={ev_id}-{dep_id}"
             res_h2h = requests.get(h2h_url, headers=headers, timeout=5)
-            if res_h2h.status_code
+            if res_h2h.status_code == 200:
+                d = res_h2h.json().get("response", [])
+                return d[:10]
+    except Exception:
+        pass
+    return []
+
+# --- KONTROL PANELİ ---
+st.sidebar.header("🕹️ Kontrol Paneli")
+if st.sidebar.button("🔄 Bülteni Yenile (1 Kredi)"):
+    if os.path.exists(CACHE_FILE):
+        os.remove(CACHE_FILE)
+    st.rerun()
+
+maclar, is_cached = tum_liglerin_verisini_getir()
+
+if is_cached:
+    st.
