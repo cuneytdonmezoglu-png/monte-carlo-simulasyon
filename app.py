@@ -140,29 +140,4 @@ mac_listesi = []
 
 for m in maclar:
     if isinstance(m, dict) and "home_team" in m and "away_team" in m:
-        home = m.get("home_team", "Ev")
-        away = m.get("away_team", "Dep")
-        sport = m.get("sport_title", "Futbol")
-        mac_listesi.append(str(sport) + ": " + str(home) + " vs " + str(away))
-        gecerli_maclar.append(m)
-
-if not gecerli_maclar:
-    st.error("Onbellekteki mac verisinin bicimi uyumsuz.")
-    st.stop()
-
-secilen_str = st.selectbox("Simule Etmek Istedigin Maci Sec:", mac_listesi)
-secilen_mac = gecerli_maclar[mac_listesi.index(secilen_str)]
-
-ev = str(secilen_mac.get("home_team", "Ev"))
-dep = str(secilen_mac.get("away_team", "Deplasman"))
-
-# Oranları Çek
-bookmakers = secilen_mac.get("bookmakers", [])
-ev_o, ber_o, dep_o, buro_detaylari = [], [], [], []
-
-if isinstance(bookmakers, list):
-    for bm in bookmakers:
-        if isinstance(bm, dict):
-            b_name = bm.get("title", "Buro")
-            for mkt in bm.get("markets", []):
-                if isinstance(mkt
+        home = m.get
