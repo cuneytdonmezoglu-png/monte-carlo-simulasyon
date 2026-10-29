@@ -106,4 +106,61 @@ if st.sidebar.button("Bulteni Yenile (Kredi Harcar)"):
             pass
     st.rerun()
 
-maclar, is_cached = tum_liglerin
+maclar, is_cached = tum_liglerin_verisini_getir()
+
+if is_cached:
+    st.sidebar.success("Yuklu Mac Sayisi: " + str(len(maclar)) + " (Kredi Harcanmiyor)")
+else:
+    st.sidebar.info("Taze Bulten Cekildi")
+
+if not maclar or len(maclar) == 0:
+    st.warning("Bulten verisi cekilemedi veya aktif mac bulunamadi.")
+    st.stop()
+
+# --- GÜVENLİ MAÇ SEÇİMİ ---
+mac_secim_dict = {}
+
+for idx, m in enumerate(maclar):
+    if isinstance(m, dict) and "home_team" in m and "away_team" in m:
+        home = str(m.get("home_team", "Ev"))
+        away = str(m.get("away_team", "Dep"))
+        sport = str(m.get("sport_title", "Futbol"))
+        match_id = str(m.get("id", str(idx)))
+        
+        label = sport + ": " + home + " vs " + away + " [" + match_id[:6] + "]"
+        mac_secim_dict[label] = m
+
+if not mac_secim_dict:
+    st.error("Onbellekteki mac verisinin bicimi uyumsuz.")
+    st.stop()
+
+secilen_str = st.selectbox("Simule Etmek Istedigin Maci Sec:", list(mac_secim_dict.keys()))
+secilen_mac = mac_secim_dict[secilen_str]
+
+ev = str(secilen_mac.get("home_team", "Ev"))
+dep = str(secilen_mac.get("away_team", "Deplasman"))
+
+# Oranları Çek
+bookmakers = secilen_mac.get("bookmakers", [])
+ev_o, ber_o, dep_o, buro_detaylari = [], [], [], []
+
+if isinstance(bookmakers, list):
+    for bm in bookmakers:
+        if isinstance(bm, dict):
+            b_name = str(bm.get("title", "Buro"))
+            markets = bm.get("markets", [])
+            if isinstance(markets, list):
+                for mkt in markets:
+                    if isinstance(mkt, dict) and str(mkt.get("key")) == "h2h":
+                        outcomes = mkt.get("outcomes", [])
+                        if isinstance(outcomes, list):
+                            e_price, b_price, d_price = None, None, None
+                            for out in outcomes:
+                                if isinstance(out, dict):
+                                    nm = str(out.get("name", ""))
+                                    pr = out.get("price")
+                                    if nm == ev: e_price = pr
+                                    elif nm == "Draw": b_price = pr
+                                    elif nm == dep: d_price = pr
+                            
+                            if e_price is not
