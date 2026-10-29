@@ -51,7 +51,6 @@ def tum_liglerin_verisini_getir():
 
     return [], False
 
-# --- API-FOOTBALL OTOMATİK H2H BİLGİSİ ---
 @st.cache_data(ttl=86400)
 def h2h_ve_form_getir(ev_takim, dep_takim):
     headers = {
@@ -74,13 +73,12 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
                 res_h2h = requests.get(h2h_url, headers=headers, timeout=5)
                 
                 if res_h2h.status_code == 200:
-                    h2h_data = res_h2h.json().get('response', [])
-                    return h2h_data[:10]
+                    return res_h2h.json().get('response', [])[:10]
     except Exception:
         pass
     return []
 
-# --- CONTROL PANEL ---
+# --- KONTROL PANELİ ---
 st.sidebar.header("🕹️ Kontrol Paneli")
 if st.sidebar.button("🔄 Bülteni Yenile (1 Kredi)"):
     if os.path.exists(CACHE_FILE):
@@ -92,36 +90,4 @@ maclar, is_cached = tum_liglerin_verisini_getir()
 if is_cached:
     st.sidebar.success(f"🛡️ Yüklü Maç Sayısı: {len(maclar)} (Kredi Harcanmıyor)")
 else:
-    st.sidebar.info("🌐 Taze Bülten Çekildi")
-
-if not maclar:
-    st.warning("Aktif maç verisi bulunamadı.")
-    st.stop()
-
-# --- MAÇ SEÇİMİ ---
-mac_listesi = [f"{m.get('sport_title', 'Futbol')}: {m['home_team']} vs {m['away_team']}" for m in maclar]
-secilen_str = st.selectbox("📌 Simüle Etmek İstediğin Maçı Seç:", mac_listesi)
-secilen_mac = maclar[mac_listesi.index(secilen_str)]
-
-ev, dep = secilen_mac['home_team'], secilen_mac['away_team']
-
-# Oran Verilerini Derleme
-bookmakers = secilen_mac.get('bookmakers', [])
-ev_o, ber_o, dep_o, buro_detaylari = [], [], [], []
-
-for bm in bookmakers:
-    b_name = bm['title']
-    for mkt in bm['markets']:
-        if mkt['key'] == 'h2h':
-            e = next((i['price'] for i in mkt['outcomes'] if i['name'] == ev), None)
-            b = next((i['price'] for i in mkt['outcomes'] if i['name'] == 'Draw'), None)
-            d = next((i['price'] for i in mkt['outcomes'] if i['name'] == dep), None)
-            if e and b and d:
-                ev_o.append(e)
-                ber_o.append(b)
-                dep_o.append(d)
-                buro_detaylari.append({"Büro": b_name, "MS 1": e, "MS X": b, "MS 2": d})
-
-avg_ev = np.mean(ev_o) if ev_o else 2.00
-avg_ber = np.mean(ber_o) if ber_o else 3.20
-avg_dep = np.mean(dep_o) if dep_o else 3.5
+    st.sidebar.info("🌐 T
