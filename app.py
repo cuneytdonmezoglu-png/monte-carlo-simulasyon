@@ -60,38 +60,35 @@ def tum_liglerin_verisini_getir():
 
     return [], False
 
-def metni_temizle(metin):
-    if not isinstance(metin, str):
-        return "", []
-    tr_map = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
-    temiz = metin.translate(tr_map)
-    gereksiz = ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Oznur", "Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC", "BB"]
-    kelimeler = [k for k in temiz.split() if k not in gereksiz]
-    sade = " ".join(kelimeler)
-    return sade, kelimeler
-
 def takim_id_bul(takim_adi, headers):
-    temiz_metin, kelimeler = metni_temizle(takim_adi)
-    arama_listesi = []
-    if temiz_metin:
-        arama_listesi.append(temiz_metin)
-    if kelimeler:
-        arama_listesi.append(kelimeler[-1])
-        arama_listesi.append(kelimeler[0])
-    arama_listesi.append(str(takim_adi))
+    if not isinstance(takim_adi, str):
+        return None
     
-    benzersiz_sorgular = list(dict.fromkeys([s.strip() for s in arama_listesi if len(s.strip()) > 2]))
+    # Sponsor ve ekleri temizle, doğrudan ana kulüp adını bırak
+    temiz = takim_adi
+    for g in ["Torku", "Atiker", "Yukatel", "Bitexen", "Mondihome", "Oznur", "Kablo", "Rams", "Corendon", "SK", "FK", "Club", "FC", "BB"]:
+        temiz = temiz.replace(g, "")
+    
+    kelimeler = [k.strip() for k in temiz.split() if len(k.strip()) > 2]
+    ana_kelime = kelimeler[-1] if kelimeler else takim_adi
 
-    for sorgu in benzersiz_sorgular:
-        try:
-            url = "https://api-football-v1.p.rapidapi.com/v3/teams?search=" + sorgu
-            res = requests.get(url, headers=headers, timeout=4)
-            if res.status_code == 200:
-                data = res.json().get("response", [])
-                if data and isinstance(data, list) and len(data) > 0:
-                    return data[0]["team"]["id"]
-        except Exception:
-            pass
+    # Doğrudan en karakteristik kelimeyle (Örn: Konyaspor, Galatasaray) RapidAPI'de arat
+    try:
+        url = "https://api-football-v1.p.rapidapi.com/v3/teams?search=" + ana_kelime
+        res = requests.get(url, headers=headers, timeout=4)
+        if res.status_code == 200:
+            data = res.json().get("response", [])
+            if data and isinstance(data, list):
+                for item in data:
+                    t_info = item.get("team", {})
+                    t_name = t_info.get("name", "")
+                    # Eğer isimler uyuşuyorsa ID'yi direkt döndür
+                    if ana_kelime.lower() in t_name.lower() or t_name.lower() in takim_adi.lower():
+                        return t_info.get("id")
+                # Eşleşme olmazsa ilk bulunanın ID'sini ver
+                return data[0]["team"]["id"]
+    except Exception:
+        pass
     return None
 
 @st.cache_data(ttl=86400)
@@ -134,7 +131,7 @@ if not maclar or len(maclar) == 0:
     st.warning("Bulten verisi cekilemedi veya aktif mac bulunamadi.")
     st.stop()
 
-# --- GÜVENLİ MAÇ SEÇİMİ (Benzersiz ID'ler ile çökme engellendi) ---
+# --- GÜVENLİ MAÇ SEÇİMİ ---
 mac_secim_dict = {}
 
 for idx, m in enumerate(maclar):
@@ -142,14 +139,13 @@ for idx, m in enumerate(maclar):
         home = str(m.get("home_team", "Ev"))
         away = str(m.get("away_team", "Dep"))
         sport = str(m.get("sport_title", "Futbol"))
-        match_id = str(m.get("id", str(idx))) 
+        match_id = str(m.get("id", str(idx)))
         
-        # Benzersiz anahtar oluşturuyoruz (Streamlit Selectbox çökmesini önler)
         label = sport + ": " + home + " vs " + away + " [" + match_id[:6] + "]"
         mac_secim_dict[label] = m
 
 if not mac_secim_dict:
-    st.error("Onbellekteki mac verisinin bicimi uyumsuz. Lütfen bülteni yenileyin.")
+    st.error("Onbellekteki mac verisinin bicimi uyumsuz.")
     st.stop()
 
 secilen_str = st.selectbox("Simule Etmek Istedigin Maci Sec:", list(mac_secim_dict.keys()))
@@ -236,7 +232,6 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
         p_ev = h_ev / toplam_oran
         p_dep = h_dep / toplam_oran
         
-        # Matematiksel cöküntüleri (Log 0) engellemek icin sinirlama
         p_ev = min(0.99, max(0.01, p_ev))
         p_dep = min(0.99, max(0.01, p_dep))
 
