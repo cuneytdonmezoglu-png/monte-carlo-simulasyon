@@ -97,13 +97,3 @@ def h2h_ve_form_getir(ev_takim, dep_takim):
     return []
 
 # --- KONTROL PANELİ ---
-st.sidebar.header("🕹️ Kontrol Paneli")
-if st.sidebar.button("🔄 Bülteni Yenile (1 Kredi)"):
-    if os.path.exists(CACHE_FILE):
-        os.remove(CACHE_FILE)
-    st.rerun()
-
-maclar, is_cached = tum_liglerin_verisini_getir()
-
-if is_cached:
-    st.
