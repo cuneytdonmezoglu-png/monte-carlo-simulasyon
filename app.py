@@ -8,15 +8,8 @@ from datetime import datetime
 
 st.set_page_config(page_title="Pro Monte Carlo & Skor Analiz Paneli", page_icon="⚽", layout="wide")
 
-def _anahtar_oku(isim):
-    try:
-        if isim in st.secrets:
-            return str(st.secrets[isim])
-    except Exception:
-        pass
-    return os.environ.get(isim, "")
-
-ODDS_API_KEY = _anahtar_oku("ODDS_API_KEY")
+# API Anahtarı doğrudan kod içine sabitlendi (Hata riski sıfırlandı)
+ODDS_API_KEY = "f6649c5150399729774787d9fac15cbb"
 CACHE_FILE = "maclar_cache.json"
 
 st.title("⚽ Profesyonel Futbol Monte Carlo, Skor Tahmin & Canlı H2H Paneli")
@@ -131,10 +124,6 @@ if st.sidebar.button("Bulteni Yenile (Kredi Harcar)"):
         except Exception:
             pass
     st.rerun()
-
-if not ODDS_API_KEY:
-    st.error("ODDS_API_KEY bulunamadı. st.secrets veya ortam değişkeni olarak ekleyin.")
-    st.stop()
 
 maclar, is_cached = tum_liglerin_verisini_getir()
 
@@ -377,4 +366,12 @@ if st.button("Detayli Gelismis Simulasyonu Calistir", type="primary"):
 
                 n = len(h2h_gecmis)
                 c1, c2, c3, c4 = st.columns(4)
-                c
+                c1.metric(ev + " Galibiyet", ev_galibiyet)
+                c2.metric("Beraberlik", beraberlik)
+                c3.metric(dep + " Galibiyet", dep_galibiyet)
+                c4.metric("Maç Başı Gol", f"{toplam_gol_h2h / n:.2f}" if n else "-")
+                
+                st.table(pd.DataFrame(h2h_gecmis))
+            else:
+                if h2h_hata:
+                    st
