@@ -115,5 +115,58 @@ def sofascore_h2h_getir(ev_takim, dep_takim):
                 home_score = evn.get("homeScore", {}).get("current", 0)
                 away_score = evn.get("awayScore", {}).get("current", 0)
                 
-                islenmis_
-                
+                islenmis_maclar.append({
+                    "Tarih": tarih,
+                    "Lig": turnuva,
+                    "Ev Sahibi": home_t,
+                    "Skor": f"{home_score} - {away_score}",
+                    "Deplasman": away_t
+                })
+            return islenmis_maclar, None
+    except Exception as e:
+        return [], f"Bağlantı hatası: {str(e)}"
+    
+    return [], "Arşivde karşılıklı maç bulunamadı."
+
+# --- KONTROL PANELİ ---
+st.sidebar.header("Kontrol Paneli")
+if st.sidebar.button("Bulteni Yenile (Kredi Harcar)"):
+    if os.path.exists(CACHE_FILE):
+        try:
+            os.remove(CACHE_FILE)
+        except Exception:
+            pass
+    st.rerun()
+
+maclar, is_cached = tum_liglerin_verisini_getir()
+
+if is_cached:
+    st.sidebar.success("Yuklu Mac Sayisi: " + str(len(maclar)) + " (Kredi Harcanmiyor)")
+else:
+    st.sidebar.info("Taze Bulten Cekildi")
+
+if not maclar or len(maclar) == 0:
+    st.warning("Bulten verisi cekilemedi veya aktif mac bulunamadi.")
+    st.stop()
+
+# --- GÜVENLİ MAÇ SEÇİMİ ---
+mac_secim_dict = {}
+
+for idx, m in enumerate(maclar):
+    if isinstance(m, dict) and "home_team" in m and "away_team" in m:
+        home = str(m.get("home_team", "Ev"))
+        away = str(m.get("away_team", "Dep"))
+        sport = str(m.get("sport_title", "Futbol"))
+        match_id = str(m.get("id", str(idx)))
+        
+        label = sport + ": " + home + " vs " + away + " [" + match_id[:6] + "]"
+        mac_secim_dict[label] = m
+
+if not mac_secim_dict:
+    st.error("Onbellekteki mac verisinin bicimi uyumsuz.")
+    st.stop()
+
+secilen_str = st.selectbox("Simule Etmek Istedigin Maci Sec:", list(mac_secim_dict.keys()))
+secilen_mac = mac_secim_dict[secilen_str]
+
+ev = str
