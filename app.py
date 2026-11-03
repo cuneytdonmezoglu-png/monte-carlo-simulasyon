@@ -245,4 +245,76 @@ ms2 = float(np.sum(e_gol < d_gol)) / sim_sayisi * 100.0
 
 model_fair_ms1 = 100.0 / ms1 if ms1 > 0 else 999.0
 model_fair_msX = 100.0 / msX if msX > 0 else 999.0
-model_fair_
+model_fair_ms2 = 100.0 / ms2 if ms2 > 0 else 999.0
+
+h2h_gecmis = h2h_bul_football_data(ev, dep, sport_title)
+
+# EKRAN MİMARİSİ
+st.markdown("---")
+col_m1, col_m2, col_m3 = st.columns(3)
+col_m1.metric("Model xG: " + ev, f"{ev_xg:.2f}")
+col_m2.metric("Model xG: Beraberlik", "-")
+col_m3.metric("Model xG: " + dep, f"{dep_xg:.2f}")
+st.markdown("---")
+
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🎯 Bağımsız Skor & Model Matrisi",
+    "⏱️ Gol Dakikalari & IY",
+    "📊 CSV H2H Arşivi",
+    "💎 Gerçek Değer (Value Bet)",
+    "🌐 Piyasa Oranları"
+])
+
+with tab1:
+    st.subheader("🎯 Bağımsız Monte Carlo Olasılık Matrisi")
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        st.write("### 🏆 En Muhtemel 5 Skor")
+        st.dataframe(pd.DataFrame(en_olasi_skor_listesi), use_container_width=True)
+    with col_s2:
+        st.write("### 📈 Bağımsız Maç Sonucu Olasılıkları")
+        df_ms = pd.DataFrame({
+            "Secenek": ["MS 1 (" + ev + ")", "MS X (Beraberlik)", "MS 2 (" + dep + ")"],
+            "Model Olasilik (%)": [ms1, msX, ms2],
+            "Model Adil Orani": [model_fair_ms1, model_fair_msX, model_fair_ms2]
+        })
+        st.dataframe(df_ms.style.format({"Model Olasilik (%)": "{:.1f}%", "Model Adil Orani": "{:.2f}"}), use_container_width=True)
+
+with tab2:
+    st.subheader("Zaman Dilimlerine Göre Gol Olasılıkları")
+    iy_gol_var = float(np.sum((e_iy + d_iy) > 0.5)) / sim_sayisi * 100.0
+    ust25 = float(np.sum((e_gol + d_gol) > 2.5)) / sim_sayisi * 100.0
+    st.metric("İlk Yarı 0.5 Gol Üst", f"%{iy_gol_var:.1f}")
+    st.metric("Maç Geneli 2.5 Gol Üst", f"%{ust25:.1f}")
+
+with tab3:
+    st.subheader("İki Takım Arasındaki Geçmiş Maçlar (CSV Arşivi)")
+    if h2h_gecmis:
+        st.table(pd.DataFrame(h2h_gecmis))
+    else:
+        st.info("Bu lig için arşivde karşılıklı maç kaydı bulunamadı.")
+
+with tab4:
+    st.subheader("💎 Piyasa vs Model Değer Karşılaştırması (Value Bet)")
+    val_1 = max_ev > model_fair_ms1
+    val_X = max_ber > model_fair_msX
+    val_2 = max_dep > model_fair_ms2
+
+    df_val = pd.DataFrame({
+        "Secenek": ["MS 1", "MS X", "MS 2"],
+        "Model Adil Orani": [f"{model_fair_ms1:.2f}", f"{model_fair_msX:.2f}", f"{model_fair_ms2:.2f}"],
+        "Piyasa En Yuksek Oran": [f"{max_ev:.2f}", f"{max_ber:.2f}", f"{max_dep:.2f}"],
+        "Value Durumu": [
+            "DEĞERLİ (Piyasa Yüksek Ödüyor)" if val_1 else "Değersiz",
+            "DEĞERLİ (Piyasa Yüksek Ödüyor)" if val_X else "Değersiz",
+            "DEĞERLİ (Piyasa Yüksek Ödüyor)" if val_2 else "Değersiz"
+        ]
+    })
+    st.table(df_val)
+
+with tab5:
+    st.subheader("Yabancı Büroların Canlı Oran Listesi")
+    if buro_detaylari:
+        st.dataframe(pd.DataFrame(buro_detaylari))
+    else:
+        st.info("Bu maç için büro oranı bulunamadı.")
